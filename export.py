@@ -9,6 +9,7 @@ import settings
 #                        #
 ##########################
 
+"""
 pn_client = PlayNicely(username=settings.playnicely_user, password=settings.playnicely_password)
 
 # Get user information
@@ -20,10 +21,8 @@ print "Your projects are:"
 for i, p in enumerate(pn_projects):
     print "    [%d] %s" % (i+1, p.name)
 
-
 while True:
-
-    #get the project you want to to import
+    #get the project you want to to export
     pn_proj_id = raw_input("\nPlease select the project you want to export: ")
 
     #make sure input is valid
@@ -38,7 +37,7 @@ while True:
         else:
             print "Sorry, you entered an incorrect value, please try again!"
 
-# Get the first of your projects so that we can show some items for it
+# Get the project that you want to export from
 pn_project = pn_projects[pn_proj_id-1]
 
 items = pn_client.items.list(pn_project.project_id)
@@ -48,6 +47,7 @@ print "%d items are ready to be exported from project %s" % (len(items), pn_proj
 #for item in items:
 #    print "    %s (ID: %d)" % (item.subject, item.item_id)
 
+"""
 #####################
 #                   #
 #  get github bits  #
@@ -59,6 +59,30 @@ gh_repos = gh_client.repos.list(settings.github_user)
 
 for i, p in enumerate(gh_repos):
     print "    [%d] %s" % (i+1, p.name)
+
+while True:
+    #get the repo you want to import to:
+    gh_repo_id = raw_input("\nPlease select the project you want to import to: ")
+
+    #make sure input is valid
+    try:
+        gh_repo_id = int(gh_repo_id)
+        gh_repo_id_test = gh_repo_id - 1
+    except ValueError:
+        print "Sorry, the value you entered was not recognized"
+    else:
+        if gh_repo_id_test in range(len(gh_repos)):
+            break
+        else:
+            print "Sorry, you entered an incorrect value, please try again!"
+
+# Get the repo that you want to import to:
+gh_repo = settings.github_user+'/'+gh_repos[gh_repo_id-1].name
+gh_issues = gh_client.issues.list(gh_repo)
+gh_issues.extend(gh_client.issues.list(gh_repo, state='closed'))
+
+print "%d items are about to be deleted from project %s" % (len(gh_issues), gh_repo)
+
 
 print "\nAll done for now, remember, this is Work in Progress!"
 
