@@ -4,4 +4,4 @@ this is a work in progress, use at your own risk!
 
 right now it won't work cos the settings file is not in the repo, you can figure out what you need yourself, but you're not gonna get much out of this anyway :)
 
-requires the playnicely python client that can be downloaded from here https://github.com/playnicelyapp/python-playnicely
+requires the playnicely python client that can be downloaded from here https://github.com/playnicelyapp/python-playnicely and the github2 client that can be found here http://packages.python.org/github2/index.html
