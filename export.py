@@ -40,7 +40,7 @@ while True:
 # Get the project that you want to export from
 pn_project = pn_projects[pn_proj_id-1]
 
-items = pn_client.items.list(pn_project.project_id)
+items = pn_client.items.list(pn_project.project_id, detail="full")
 print "%d items are ready to be exported from project %s\n" % (len(items), pn_project.name)
 
 # list all items
@@ -121,7 +121,7 @@ for user in pn_users:
             while True:
                 match = raw_input("pn: %s and gh: %s were matched. correct? [Y/n]" % (user.username, results[0].username))
                 if match == 'Y' or match == '':
-                    matches.append((user.user_id, results[0].id))
+                    matches.append((user.user_id, results[0].username))
                     print '\n'
                     break
                 elif match == 'n':
@@ -132,7 +132,7 @@ for user in pn_users:
                         if len(q_results) == 1:
                             match = raw_input("pn: %s and gh: %s were matched. correct? [Y/n]" % (user.username, q_results[0].username))
                             if match == 'Y' or match == '':
-                                matches.append((user.user_id, q_results[0].id))
+                                matches.append((user.user_id, q_results[0].username))
                                 print '\n'
                                 break
                             elif match == 'n':
@@ -154,7 +154,7 @@ for user in pn_users:
                                             if len(q_results) == 1:
                                                 match = raw_input("pn: %s and gh: %s were matched. correct? [Y/n]" % (user.username, q_results[0].username))
                                                 if match == 'Y' or match == '':
-                                                    matches.append((user.user_id, q_results[0].id))
+                                                    matches.append((user.user_id, q_results[0].username))
                                                     print '\n'
                                                     break
                                                 elif match == 'n':
@@ -191,7 +191,7 @@ for user in pn_users:
                             if len(q_results) == 1:
                                 match = raw_input("pn: %s and gh: %s were matched. correct? [Y/n]" % (user.username, q_results[0].username))
                                 if match == 'Y' or match == '':
-                                    matches.append((user.user_id, q_results[0].id))
+                                    matches.append((user.user_id, q_results[0].username))
                                     print '\n'
                                     break
                                 elif match == 'n':
@@ -213,7 +213,7 @@ for user in pn_users:
                                                 if len(q_results) == 1:
                                                     match = raw_input("pn: %s and gh: %s were matched. correct? [Y/n]" % (user.username, q_results[0].username))
                                                     if match == 'Y' or match == '':
-                                                        matches.append((user.user_id, q_results[0].id))
+                                                        matches.append((user.user_id, q_results[0].username))
                                                         print '\n'
                                                         break
                                                     elif match == 'n':
@@ -259,7 +259,7 @@ for user in pn_users:
                         if len(q_results) == 1:
                             match = raw_input("pn: %s and gh: %s were matched. correct? [Y/n]" % (user.username, q_results[0].username))
                             if match == 'Y' or match == '':
-                                matches.append((user.user_id, q_results[0].id))
+                                matches.append((user.user_id, q_results[0].username))
                                 print '\n'
                                 break
                             elif match == 'n':
@@ -281,7 +281,7 @@ for user in pn_users:
                                             if len(q_results) == 1:
                                                 match = raw_input("pn: %s and gh: %s were matched. correct? [Y/n]" % (user.username, q_results[0].username))
                                                 if match == 'Y' or match == '':
-                                                    matches.append((user.user_id, q_results[0].id))
+                                                    matches.append((user.user_id, q_results[0].username))
                                                     print '\n'
                                                     break
                                                 elif match == 'n':
@@ -309,6 +309,30 @@ for user in pn_users:
                     pass
 
                 print "Sorry, the value you entered was not recognized"
+
+####################
+#                  #
+#  issue transfer  #
+#                  #
+####################
+
+'''
+for item in items:
+    if item.status == "Closed":
+        item_state = "Closed"
+    else:
+        item_state = "Open"
+
+    item_user = ''
+    for pn, gh in matches:
+        if pn == item.responsible:
+            item_user = gh
+            break
+        
+        
+    gh_issue = gh_client.issues.open(gh_repo, title=item.subject, body=item.body, assignee=item_user, state=item_state)
+
+'''
 
 '''
 print '\npn items'
