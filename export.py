@@ -2,6 +2,7 @@ from playnicely.client import PlayNicely
 from github2.client import Github
 
 import settings
+import sys
 
 ##########################
 #                        #
@@ -9,7 +10,6 @@ import settings
 #                        #
 ##########################
 
-"""
 pn_client = PlayNicely(username=settings.playnicely_user, password=settings.playnicely_password)
 
 # Get user information
@@ -41,13 +41,12 @@ while True:
 pn_project = pn_projects[pn_proj_id-1]
 
 items = pn_client.items.list(pn_project.project_id)
-print "%d items are ready to be exported from project %s" % (len(items), pn_project.name)
+print "%d items are ready to be exported from project %s\n" % (len(items), pn_project.name)
 
 # list all items
 #for item in items:
 #    print "    %s (ID: %d)" % (item.subject, item.item_id)
 
-"""
 #####################
 #                   #
 #  get github bits  #
@@ -81,7 +80,80 @@ gh_repo = settings.github_user+'/'+gh_repos[gh_repo_id-1].name
 gh_issues = gh_client.issues.list(gh_repo)
 gh_issues.extend(gh_client.issues.list(gh_repo, state='closed'))
 
-print "%d items are about to be deleted from project %s" % (len(gh_issues), gh_repo)
+#make sure there's no issues in gh
+if len(gh_issues):
+    print "There are %d issues in project %s. If you want to maintain playnice.ly issue numbering please remove them from your github account web interface." % (len(gh_issues), gh_repo)
+
+    #get input from user
+    quit = raw_input("\nPress q to exit the script, any other key to continue: ")
+
+    #quit if so commanded
+    if quit == 'q':
+        sys.exit()
+    else:
+        pass
+
+#do users check
+pn_user_ids = pn_client.projects.show(project_id=pn_project.project_id, detail="full").user_ids
+
+pn_users = []
+
+print "Users for playnice.ly project %s:" % (pn_project.name)
+for i,u in enumerate(pn_user_ids):
+    user = pn_client.users.show(user_id=u, detail="compact")
+    print "[%d] %s" % (i+1, user.username)
+    pn_users.append(user)
+
+print "\nAttempting to match with github users...\n"
+
+matches = []
+
+for user in pn_users:
+    print 'ping'
+    results = gh_client.users.search(user.first_name+" "+user.surname)    
+    if results:
+        if len(results) == 1:
+            while True:
+                match = raw_input("pn: %s and gh: %s were matched. correct? [Y/n]" % (user.username, results[0].username))
+                if match == 'Y' or match == '':
+                    matches.append((user.user_id, results[0].id))
+                    print '\n'
+                    break
+                elif match == 'n':
+                    print 'I\'m sorry, we couldn\'t match %s automatically.' % (user.username)
+                    query = raw_input("Search GitHub for user: ")
+                    #TODO: finish
+                    break
+                else:
+                    print 'Unrecognized input, enter \'Y\' to confirm match, or \'n\' not to.'
+        else:
+            print "the following github matches were found for playnice.ly user %s:" % (user.username)
+            for i,r in enumerate(results):
+                print "[%d] %s" % (i+1, r.username)
+
+            while True:
+                match = raw_input("Enter the number corresponding to the correct match. Enter \'n\' if there is no match, \'g\' if the user is not on github:")
+                if match == 'g':
+                    break
+                elif match == 'n':
+                    query = raw_input("Search GitHub for user: ")
+                    #TODO: finish
+                else:
+                    try:
+                        match = int(match)
+                        if match-1 in range(len(results)):
+                            matches.append((user.user_id, r.username))
+                            break
+                    except ValueError:
+                        pass
+
+                    print "Sorry, the value you entered was not recognized"
+    else:
+        print 'huh'
+
+
+print matches
+
 
 
 print "\nAll done for now, remember, this is Work in Progress!"
