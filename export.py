@@ -115,6 +115,7 @@ matches = []
 
 for user in pn_users:
     results = gh_client.users.search(user.first_name+" "+user.surname)    
+    print results
     if results:
         if len(results) == 1:
             while True:
@@ -146,7 +147,7 @@ for user in pn_users:
                             while True:
                                 match = raw_input("Enter the number corresponding to the correct match. Enter \'n\' if there is no match:")
                                 if match == 'n':
-                                    while True
+                                    while True:
                                         query = raw_input("Search GitHub for user: ")
                                         q_results = gh_client.users.search(query)
                                         if q_results:
@@ -171,7 +172,6 @@ for user in pn_users:
 
                                     print "Sorry, the value you entered was not recognized"
 
-                    break
                 else:
                     print 'Unrecognized input, enter \'Y\' to confirm match, or \'n\' not to.'
         else:
@@ -184,7 +184,7 @@ for user in pn_users:
                 if match == 'g':
                     break
                 elif match == 'n':
-                    while True
+                    while True:
                         query = raw_input("Search GitHub for user: ")
                         q_results = gh_client.users.search(query)
                         if q_results:
@@ -206,7 +206,7 @@ for user in pn_users:
                                 while True:
                                     match = raw_input("Enter the number corresponding to the correct match. Enter \'n\' if there is no match:")
                                     if match == 'n':
-                                        while True
+                                        while True:
                                             query = raw_input("Search GitHub for user: ")
                                             q_results = gh_client.users.search(query)
                                             if q_results:
@@ -241,15 +241,82 @@ for user in pn_users:
                         pass
 
                     print "Sorry, the value you entered was not recognized"
+
     else:
-        #TODO: finish
+        print "the following github matches were found for playnice.ly user %s:" % (user.username)
+        for i,r in enumerate(results):
+            print "[%d] %s" % (i+1, r.username)
 
+        while True:
+            match = raw_input("Enter the number corresponding to the correct match. Enter \'n\' if there is no match, \'g\' if the user is not on github:")
+            if match == 'g':
+                break
+            elif match == 'n':
+                while True:
+                    query = raw_input("Search GitHub for user: ")
+                    q_results = gh_client.users.search(query)
+                    if q_results:
+                        if len(q_results) == 1:
+                            match = raw_input("pn: %s and gh: %s were matched. correct? [Y/n]" % (user.username, q_results[0].username))
+                            if match == 'Y' or match == '':
+                                matches.append((user.user_id, q_results[0].id))
+                                print '\n'
+                                break
+                            elif match == 'n':
+                                print 'I\'m sorry, we couldn\'t match %s.' % (user.username)
+                            else:
+                                print 'Unrecognized input, enter \'Y\' to confirm match, or \'n\' not to.'
+                        else:
+                            print "the following github matches were found for playnice.ly user %s:" % (user.username)
+                            for i,r in enumerate(results):
+                                print "[%d] %s" % (i+1, r.username)
 
+                            while True:
+                                match = raw_input("Enter the number corresponding to the correct match. Enter \'n\' if there is no match:")
+                                if match == 'n':
+                                    while True:
+                                        query = raw_input("Search GitHub for user: ")
+                                        q_results = gh_client.users.search(query)
+                                        if q_results:
+                                            if len(q_results) == 1:
+                                                match = raw_input("pn: %s and gh: %s were matched. correct? [Y/n]" % (user.username, q_results[0].username))
+                                                if match == 'Y' or match == '':
+                                                    matches.append((user.user_id, q_results[0].id))
+                                                    print '\n'
+                                                    break
+                                                elif match == 'n':
+                                                    print 'I\'m sorry, we couldn\'t match %s.' % (user.username)
+                                                else:
+                                                    print 'Unrecognized input, enter \'Y\' to confirm match, or \'n\' not to.'
+                                else:
+                                    try:
+                                        match = int(match)
+                                        if match-1 in range(len(results)):
+                                            matches.append((user.user_id, r.username))
+                                            break
+                                    except ValueError:
+                                        pass
+
+                                    print "Sorry, the value you entered was not recognized"
+
+            else:
+                try:
+                    match = int(match)
+                    if match-1 in range(len(results)):
+                        matches.append((user.user_id, r.username))
+                        break
+                except ValueError:
+                    pass
+
+                print "Sorry, the value you entered was not recognized"
+
+'''
 print '\npn items'
 print items
 
 print '\ngh issues'
-print gh.issues
+print gh_issues
+'''
 
 print '\n matches, ids (pn, gh)'
 print matches
