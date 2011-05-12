@@ -367,7 +367,7 @@ for user in pn_users:
 
 print "\nInitiating issue transfer"
 
-for item in items:
+for item in items[3:10]:
     if item.status == "Closed":
         item_state = "Closed"
     else:
@@ -380,6 +380,19 @@ for item in items:
             break
         
     gh_issue = gh_client.issues.open(gh_repo, title=item.subject, body=item.body)
+    gh_issue.user = item_user
+    gh_issue.state = item_state
+    
+    # print '\n'
+    # for attr in dir(item):
+    #     print "item.%s = %s" % (attr, getattr(item, attr))
+    # print '\n'
+
+    # print '\n'
+    # for attr in dir(gh_issue):
+    #     print "gh_issue.%s = %s" % (attr, getattr(gh_issue, attr))
+    # print '\n'
+
     sleep(1)
 
 
