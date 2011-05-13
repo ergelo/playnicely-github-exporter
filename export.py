@@ -4,6 +4,8 @@ from time import sleep
 
 import settings
 import sys
+import json
+import urllib2
 
 ##########################
 #                        #
@@ -367,11 +369,11 @@ for user in pn_users:
 
 print "\nInitiating issue transfer"
 
-for item in items[3:10]:
+for item in items[20:30]:
     if item.status == "Closed":
-        item_state = "Closed"
+        item_state = "closed"
     else:
-        item_state = "Open"
+        item_state = "open"
 
     item_user = ''
     for pn, gh in matches:
@@ -380,13 +382,50 @@ for item in items[3:10]:
             break
         
     gh_issue = gh_client.issues.open(gh_repo, title=item.subject, body=item.body)
+
+    print gh_issue
+    print gh_issue.state
+
+    url = 'https://api.github.com/repos/%s/issues/%d' % (gh_repo, gh_issue.number)
+    data = {"title": gh_issue.title, "body": gh_issue.body, "assignee": item_user}
+    s = "%s:%s" % (settings.github_user, settings.github_password)
+    headers = { "Authorization": "Basic "+s.encode("base64").rstrip(), "Content-Type": "application/json" }
+    req = urllib2.Request(url, json.dumps(data), headers)
+    req.get_method = lambda : 'PATCH'
+    response = urllib2.urlopen(req)
+
+
     gh_issue.user = item_user
     gh_issue.state = item_state
     
-    # print '\n'
+    print '\n##########################################################\n'
+    print 'task '+str(item.item_id)+': '+item.status+' - '+item.subject+' - '+response.info().get('Status')
+    print '\t'+str(item.body)
+
+    for a in item.activity:
+        
+        commenter = ''
+        for pn, gh in matches:
+            if pn == item.created_by:
+                commenter = gh
+                break
+        
+        if a['type'] == 'item_comment':
+            body = "%s: %s" %(commenter, a['body'])
+            url = 'https://api.github.com/repos/%s/issues/%d/comments' % (gh_repo, gh_issue.number)
+            data = {"body": body}
+            s = "%s:%s" % (settings.github_user, settings.github_password)
+            headers = { "Authorization": "Basic "+s.encode("base64").rstrip(), "Content-Type": "application/json" }
+            req = urllib2.Request(url, json.dumps(data), headers)
+            response = urllib2.urlopen(req)
+            
+            print '\n'+response.info().get('Status')
+            print a['body']
+
+
     # for attr in dir(item):
     #     print "item.%s = %s" % (attr, getattr(item, attr))
-    # print '\n'
+    print '\n'
 
     # print '\n'
     # for attr in dir(gh_issue):
