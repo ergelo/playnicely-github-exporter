@@ -361,6 +361,35 @@ for user in pn_users:
 
                 print "Sorry, the value you entered was not recognized"
 
+################
+#              #
+#  Milestones  #
+#              #
+################
+
+print "\nMigrating Milestones\n"
+
+pn_milestones = pn_client.milestones.list(pn_project.project_id, detail="compact")
+milestone_matches = {}
+for milestone in pn_milestones:
+    url = 'https://api.github.com/repos/%s/milestones' % (gh_repo)
+    data = {"title": str(milestone.name)}
+    s = "%s:%s" % (settings.github_user, settings.github_password)
+    headers = { "Authorization": "Basic "+s.encode("base64").rstrip(), "Content-Type": "application/json" }
+    req = urllib2.Request(url, json.dumps(data), headers)
+    response = urllib2.urlopen(req) 
+
+    loc = str(response.info().get('Location'))
+    base_len = len('https://api.github.com/repos//milestones')+len(gh_repo)
+    milestone_number = int(loc[base_len+1:])
+
+    # print response.info()
+    milestone_matches[milestone.milestone_id] = milestone_number
+    
+    print "pn %s (id %d): gh id %d" % (milestone.name, milestone.milestone_id, milestone_number)
+
+# print milestone_matches
+
 ####################
 #                  #
 #  issue transfer  #
@@ -369,8 +398,17 @@ for user in pn_users:
 
 print "\nInitiating issue transfer"
 
-for item in items[20:30]:
-    if item.status == "Closed":
+# simon = []
+
+#set up auth for users
+e = "%s:%s" % (settings.github_user, settings.github_password)
+s = settings.simon_encoded
+auth = {}
+auth["ergelo"] = "Basic "+e.encode("base64").rstrip()
+auth["simonv3"] = "Basic "+s
+
+for item in items:
+    if item.status == "Closed" or item.status == "Deleted":
         item_state = "closed"
     else:
         item_state = "open"
@@ -381,48 +419,92 @@ for item in items[20:30]:
             item_user = gh
             break
         
-    gh_issue = gh_client.issues.open(gh_repo, title=item.subject, body=item.body)
+    # gh_issue = gh_client.issues.open(gh_repo, title=item.subject, body=item.body)
 
-    print gh_issue
-    print gh_issue.state
+    # print gh_issue
+    # print gh_issue.state
+    
+    if not isinstance(item.body, str):
+        item_body = "empty"
+    else:
+        item_body = str(item.body)
 
-    url = 'https://api.github.com/repos/%s/issues/%d' % (gh_repo, gh_issue.number)
-    data = {"title": gh_issue.title, "body": gh_issue.body, "assignee": item_user}
-    s = "%s:%s" % (settings.github_user, settings.github_password)
-    headers = { "Authorization": "Basic "+s.encode("base64").rstrip(), "Content-Type": "application/json" }
+    url = 'https://api.github.com/repos/%s/issues' % (gh_repo)
+    if milestone_matches[item.milestone_id]:
+        data = {"title": "task "+str(item.item_id)+": "+str(item.subject), "body": item_body, "assignee": str(item_user), "milestone": str(milestone_matches[item.milestone_id])}
+    else:
+        data = {"title": "task "+str(item.item_id)+": "+str(item.subject), "body": item_body, "assignee": str(item_user)}
+    # print data
+    # print url
+    # s = "%s:%s" % (settings.github_user, settings.github_password)
+    headers = { "Authorization": str(auth[item_user]), "Content-Type": "application/json" }
+    # print data, url, headers
     req = urllib2.Request(url, json.dumps(data), headers)
-    req.get_method = lambda : 'PATCH'
+    # req.get_method = lambda : 'PATCH'
     response = urllib2.urlopen(req)
 
+    loc = str(response.info().get('Location'))
+    base_len = len('https://api.github.com/repos//issues')+len(gh_repo)
+    issue_number = loc[base_len+1:]
+    # print response.info()
+    # print loc
+    # print len(loc)
+    # if isinstance(loc, str):
+    #     print "string!"
+    # print base_len
+    # print len(loc)-base_len+1
+    # print loc[base_len+1:]
+    # print loc[base_len+1-len(loc):]
+    # print issue_number
+    
+    # print response.info()
 
-    gh_issue.user = item_user
-    gh_issue.state = item_state
+    # print response.info()
+    
+    # gh_issue.user = item_user
+    # gh_issue.state = item_state
     
     print '\n##########################################################\n'
-    print 'task '+str(item.item_id)+': '+item.status+' - '+item.subject+' - '+response.info().get('Status')
-    print '\t'+str(item.body)
+    print 'task '+str(item.item_id)+'/issue_number '+issue_number+': '+item.subject+' - pn:'+item.status+' - gh:'+str(response.info().get('state'))+" ("+str(response.info().get('X-RateLimit-Remaining'))+" calls left)"
+    print '\t'+str(response.info().get('body')) #str(item.body)
+
+    # print response.info()
 
     for a in item.activity:
         
-        commenter = ''
-        for pn, gh in matches:
-            if pn == item.created_by:
-                commenter = gh
-                break
-        
         if a['type'] == 'item_comment':
+
+            commenter = ''
+            for pn, gh in matches:
+                if pn == a['created_by']:
+                    commenter = gh
+                    break
+        
             body = "%s: %s" %(commenter, a['body'])
-            url = 'https://api.github.com/repos/%s/issues/%d/comments' % (gh_repo, gh_issue.number)
-            data = {"body": body}
+            url = 'https://api.github.com/repos/%s/issues/%s/comments' % (gh_repo, issue_number)
+            # print url
+            data = {"body": str(a['body'])}
             s = "%s:%s" % (settings.github_user, settings.github_password)
-            headers = { "Authorization": "Basic "+s.encode("base64").rstrip(), "Content-Type": "application/json" }
+            headers = { "Authorization": str(auth[commenter]), "Content-Type": "application/json" }
             req = urllib2.Request(url, json.dumps(data), headers)
             response = urllib2.urlopen(req)
             
-            print '\n'+response.info().get('Status')
+            # print '\n'+str(response.info().get('state'))
             print a['body']
 
 
+    if item.status == "closed":
+        # print 'closing'
+        url = 'https://api.github.com/repos/%s/issues/%s' % (gh_repo, issue_number)
+        data = {"state": "closed"}
+        req = urllib2.Request(url, json.dumps(data), headers)
+        response = urllib2.urlopen(req)
+        # print response.info()
+
+    # if not item_user == settings.github_user:
+    #     simon.append(issue_number)
+
+    
     # for attr in dir(item):
     #     print "item.%s = %s" % (attr, getattr(item, attr))
     print '\n'
@@ -435,6 +517,7 @@ for item in items[20:30]:
     sleep(1)
 
 
+# print "simon's issues: "+str(simon)
 '''
 print '\npn items'
 print items
