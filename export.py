@@ -2,7 +2,7 @@ from playnicely.client import PlayNicely
 from github2.client import Github
 from time import sleep
 
-import settings
+import mysettings as settings
 import sys
 import json
 import urllib2
@@ -362,12 +362,9 @@ for user in pn_users:
 
                 print "Sorry, the value you entered was not recognized"
 
-#set up users auth dictionary
+#set up v3 auth credentials
 e = "%s:%s" % (settings.github_user, settings.github_password)
-s = settings.simon_encoded #hack!
-auth = {}
-auth[settings.github_user] = "Basic "+e.encode("base64").rstrip()
-auth["simonv3"] = "Basic "+s #hack!
+auth = "Basic "+e.encode("base64").rstrip()
 
 ################
 #              #
@@ -375,7 +372,7 @@ auth["simonv3"] = "Basic "+s #hack!
 #              #
 ################
 
-print "\nMigrating Milestones\n"
+print "Migrating Milestones\n"
 
 #get milestones from pn
 pn_milestones = pn_client.milestones.list(pn_project.project_id, detail="compact")
@@ -386,7 +383,7 @@ for milestone in pn_milestones:
     #build v3 call
     url = 'https://api.github.com/repos/%s/milestones' % (gh_repo)
     data = {"title": str(milestone.name)}
-    headers = { "Authorization": str(auth[settings.github_user]), "Content-Type": "application/json" }
+    headers = { "Authorization": str(auth), "Content-Type": "application/json" }
     req = urllib2.Request(url, json.dumps(data), headers)
     response = urllib2.urlopen(req) 
 
@@ -407,6 +404,11 @@ for milestone in pn_milestones:
 ####################
 
 print "\nInitiating issue transfer"
+
+simon = []
+fails = []
+tbclosed = []
+missedcomments = []
 
 #transfer one item at a time
 for item in items:
@@ -433,13 +435,19 @@ for item in items:
     #build v3 call - including check for milestone
     try:
         item_milestone = milestone_matches[item.milestone_id]
-        data = {"title": "task "+str(item.item_id)+": "+str(item.subject), "body": item_body, "assignee": str(item_user), "milestone": str(milestone_matches[item.milestone_id])}
+        data = {"title": "task "+str(item.item_id)+": "+str(item.subject), "body": item_body, "assignee": str(settings.github_user), "milestone": str(milestone_matches[item.milestone_id])}
     except NameError:
-        data = {"title": "task "+str(item.item_id)+": "+str(item.subject), "body": item_body, "assignee": str(item_user)}
+        data = {"title": "task "+str(item.item_id)+": "+str(item.subject), "body": item_body, "assignee": str(settings.github_user)}
     url = 'https://api.github.com/repos/%s/issues' % (gh_repo)
-    headers = { "Authorization": str(auth[item_user]), "Content-Type": "application/json" }
+    headers = { "Authorization": str(auth), "Content-Type": "application/json" }
     req = urllib2.Request(url, json.dumps(data), headers)
-    response = urllib2.urlopen(req)
+    # print data, headers, url
+    try:
+        response = urllib2.urlopen(req)
+    except urllib2.HTTPError, e:
+        fails.append(item.item_id)
+        print e.info()
+        break
 
     #extract issue number from response
     loc = str(response.info().get('Location'))
@@ -448,7 +456,7 @@ for item in items:
     
     #print useful data
     print '\n##########################################################\n'
-    print 'task '+str(item.item_id)+'/issue_number '+issue_number+': '+item.subject+':'+item.status+" - milestone "+item_milestone+" ("+str(response.info().get('X-RateLimit-Remaining'))+" calls left)"
+    print 'task '+str(item.item_id)+'/issue_number '+issue_number+': '+item.subject+':'+item.status+" - milestone "+str(item_milestone)+" ("+str(response.info().get('X-RateLimit-Remaining'))+" calls left)"
     print '\t'+str(response.info().get('body')) 
 
     #loop through activity to find comments
@@ -463,13 +471,17 @@ for item in items:
                     break
         
             #build v3 call
-            body = "%s: %s" %(commenter, a['body'])
+            body = "<strong>%s</strong>: %s" %(commenter, a['body'])
             url = 'https://api.github.com/repos/%s/issues/%s/comments' % (gh_repo, issue_number)
-            data = {"body": str(a['body'])}
+            data = {"body": str(body)}
             s = "%s:%s" % (settings.github_user, settings.github_password)
-            headers = { "Authorization": str(auth[commenter]), "Content-Type": "application/json" }
+            headers = { "Authorization": str(auth), "Content-Type": "application/json" }
             req = urllib2.Request(url, json.dumps(data), headers)
-            response = urllib2.urlopen(req)
+            try:
+                response = urllib2.urlopen(req)
+            except urllib2.HTTPError, e:
+                print e.info()
+                missedcomments.append((issue_number, body))
             
             #print comment
             print a['body']
@@ -480,13 +492,40 @@ for item in items:
         url = 'https://api.github.com/repos/%s/issues/%s' % (gh_repo, issue_number)
         data = {"state": "closed"}
         req = urllib2.Request(url, json.dumps(data), headers)
+        try:
+            response = urllib2.urlopen(req)
+        except urllib2.HTTPError, e:
+            print e.info()
+            tbclosed.append(issue_number)
+
+    if not item_user == settings.github_user:
+        simon.append(issue_number)
+    '''
+        #build v3 call
+        url = 'https://api.github.com/repos/%s/issues/%s' % (gh_repo, issue_number)
+        data = {"assignee": "simonv3"}
+        headers = { "Authorization": str(auth["simonv3"]), "Content-Type": "application/json" }
+        req = urllib2.Request(url, json.dumps(data), headers)
+        # try:
+        print data, headers, url
         response = urllib2.urlopen(req)
+        # except urllib2.HTTPError, e:
+            # print e.info()
+            # sys.exit()
+    '''
 
     print '\n'
 
     #wait to avoid overloading gh API
-    sleep(1)
+    sleep(10)
 
 #that's all folks
+print simon
+print '\n'
+print fails
+print '\n'
+print tbclosed
+print '\n'
+print missedcomments
 print "\nAll done for now, remember, this is Work in Progress!"
 
