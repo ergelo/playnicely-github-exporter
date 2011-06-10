@@ -409,6 +409,7 @@ simon = []
 fails = []
 tbclosed = []
 missedcomments = []
+closed =[]
 
 #transfer one item at a time
 for item in items:
@@ -419,105 +420,105 @@ for item in items:
     else:
         item_state = "open"
 
-    #extract item user
-    item_user = ''
-    for pn, gh in matches:
-        if pn == item.responsible:
-            item_user = gh
-            break
-    
-    #extract item body (pn puts a placeholder object when the body is empty that gh doesn't like)
-    if not isinstance(item.body, str):
-        item_body = "empty"
-    else:
-        item_body = str(item.body)
-
-    #build v3 call - including check for milestone
-    try:
-        item_milestone = milestone_matches[item.milestone_id]
-        data = {"title": "task "+str(item.item_id)+": "+str(item.subject), "body": item_body, "assignee": str(settings.github_user), "milestone": str(milestone_matches[item.milestone_id])}
-    except NameError:
-        data = {"title": "task "+str(item.item_id)+": "+str(item.subject), "body": item_body, "assignee": str(settings.github_user)}
-    url = 'https://api.github.com/repos/%s/issues' % (gh_repo)
-    headers = { "Authorization": str(auth), "Content-Type": "application/json" }
-    req = urllib2.Request(url, json.dumps(data), headers)
-    # print data, headers, url
-    try:
-        response = urllib2.urlopen(req)
-    except urllib2.HTTPError, e:
-        fails.append(item.item_id)
-        print e.info()
-        break
-
-    #extract issue number from response
-    loc = str(response.info().get('Location'))
-    base_len = len('https://api.github.com/repos//issues')+len(gh_repo)
-    issue_number = loc[base_len+1:]
-    
-    #print useful data
-    print '\n##########################################################\n'
-    print 'task '+str(item.item_id)+'/issue_number '+issue_number+': '+item.subject+':'+item.status+" - milestone "+str(item_milestone)+" ("+str(response.info().get('X-RateLimit-Remaining'))+" calls left)"
-    print '\t'+str(response.info().get('body')) 
-
-    #loop through activity to find comments
-    for a in item.activity:
-        if a['type'] == 'item_comment':
-
-            #extract comment author
-            commenter = ''
-            for pn, gh in matches:
-                if pn == a['created_by']:
-                    commenter = gh
-                    break
+        #extract item user
+        item_user = ''
+        for pn, gh in matches:
+            if pn == item.responsible:
+                item_user = gh
+                break
         
+        #extract item body (pn puts a placeholder object when the body is empty that gh doesn't like)
+        if not isinstance(item.body, str):
+            item_body = "empty"
+        else:
+            item_body = str(item.body)
+
+        #build v3 call - including check for milestone
+        try:
+            item_milestone = milestone_matches[item.milestone_id]
+            data = {"title": "task "+str(item.item_id)+": "+str(item.subject), "body": item_body, "assignee": str(settings.github_user), "milestone": str(milestone_matches[item.milestone_id])}
+        except NameError:
+            data = {"title": "task "+str(item.item_id)+": "+str(item.subject), "body": item_body, "assignee": str(settings.github_user)}
+        url = 'https://api.github.com/repos/%s/issues' % (gh_repo)
+        headers = { "Authorization": str(auth), "Content-Type": "application/json" }
+        req = urllib2.Request(url, json.dumps(data), headers)
+        # print data, headers, url
+        try:
+            response = urllib2.urlopen(req)
+        except urllib2.HTTPError, e:
+            fails.append(item.item_id)
+            print e.info()
+            break
+
+        #extract issue number from response
+        loc = str(response.info().get('Location'))
+        base_len = len('https://api.github.com/repos//issues')+len(gh_repo)
+        issue_number = loc[base_len+1:]
+        
+        #print useful data
+        print '\n##########################################################\n'
+        print 'task '+str(item.item_id)+'/issue_number '+issue_number+': '+item.subject+':'+item.status+" - milestone "+str(item_milestone)+" ("+str(response.info().get('X-RateLimit-Remaining'))+" calls left)"
+        print '\t'+str(response.info().get('body')) 
+
+        #loop through activity to find comments
+        for a in item.activity:
+            if a['type'] == 'item_comment':
+
+                #extract comment author
+                commenter = ''
+                for pn, gh in matches:
+                    if pn == a['created_by']:
+                        commenter = gh
+                        break
+            
+                #build v3 call
+                body = "<strong>%s</strong>: %s" %(commenter, a['body'])
+                url = 'https://api.github.com/repos/%s/issues/%s/comments' % (gh_repo, issue_number)
+                data = {"body": str(body)}
+                s = "%s:%s" % (settings.github_user, settings.github_password)
+                headers = { "Authorization": str(auth), "Content-Type": "application/json" }
+                req = urllib2.Request(url, json.dumps(data), headers)
+                try:
+                    response = urllib2.urlopen(req)
+                except urllib2.HTTPError, e:
+                    print e.info()
+                    missedcomments.append((issue_number, body))
+                
+                #print comment
+                print a['body']
+
+        #close item if necessary
+        if item.status == "closed":
             #build v3 call
-            body = "<strong>%s</strong>: %s" %(commenter, a['body'])
-            url = 'https://api.github.com/repos/%s/issues/%s/comments' % (gh_repo, issue_number)
-            data = {"body": str(body)}
-            s = "%s:%s" % (settings.github_user, settings.github_password)
-            headers = { "Authorization": str(auth), "Content-Type": "application/json" }
+            url = 'https://api.github.com/repos/%s/issues/%s' % (gh_repo, issue_number)
+            data = {"state": "closed"}
             req = urllib2.Request(url, json.dumps(data), headers)
             try:
                 response = urllib2.urlopen(req)
             except urllib2.HTTPError, e:
                 print e.info()
-                missedcomments.append((issue_number, body))
-            
-            #print comment
-            print a['body']
+                tbclosed.append(issue_number)
 
-    #close item if necessary
-    if item.status == "closed":
-        #build v3 call
-        url = 'https://api.github.com/repos/%s/issues/%s' % (gh_repo, issue_number)
-        data = {"state": "closed"}
-        req = urllib2.Request(url, json.dumps(data), headers)
-        try:
+        if not item_user == settings.github_user:
+            simon.append(issue_number)
+        '''
+            #build v3 call
+            url = 'https://api.github.com/repos/%s/issues/%s' % (gh_repo, issue_number)
+            data = {"assignee": "simonv3"}
+            headers = { "Authorization": str(auth["simonv3"]), "Content-Type": "application/json" }
+            req = urllib2.Request(url, json.dumps(data), headers)
+            # try:
+            print data, headers, url
             response = urllib2.urlopen(req)
-        except urllib2.HTTPError, e:
-            print e.info()
-            tbclosed.append(issue_number)
+            # except urllib2.HTTPError, e:
+                # print e.info()
+                # sys.exit()
+        '''
 
-    if not item_user == settings.github_user:
-        simon.append(issue_number)
-    '''
-        #build v3 call
-        url = 'https://api.github.com/repos/%s/issues/%s' % (gh_repo, issue_number)
-        data = {"assignee": "simonv3"}
-        headers = { "Authorization": str(auth["simonv3"]), "Content-Type": "application/json" }
-        req = urllib2.Request(url, json.dumps(data), headers)
-        # try:
-        print data, headers, url
-        response = urllib2.urlopen(req)
-        # except urllib2.HTTPError, e:
-            # print e.info()
-            # sys.exit()
-    '''
+        print '\n'
 
-    print '\n'
-
-    #wait to avoid overloading gh API
-    sleep(10)
+        #wait to avoid overloading gh API
+        sleep(2)
 
 #that's all folks
 print simon
